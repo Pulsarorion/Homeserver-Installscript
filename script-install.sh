@@ -24,11 +24,21 @@ else
     echo "Docker Compose ist bereits installiert."
 fi
 
+echo "Prüfe, ob WireGuard installiert ist..."
+if ! command -v wg > /dev/null 2>&1; then
+    echo "WireGuard ist nicht installiert. Installiere WireGuard..."
+    sudo apt update
+    sudo apt install -y wireguard
+else
+    echo "WireGuard ist bereits installiert."
+
 # UFW (Uncomplicated Firewall) installieren und konfigurieren
 echo "Installiere und konfiguriere UFW (Firewall)..."
 sudo apt install -y ufw
 sudo ufw default deny incoming
-sudo ufw default allow outgoing
+sudo ufw default deny outgoing
+sudo ufw allow out on wg0  # Nur VPN für ausgehenden Verkehr
+sudo ufw allow in on wg0
 sudo ufw allow 51820/udp  # WireGuard Port
 sudo ufw allow 9117/tcp   # Jackett Web-UI Port
 sudo ufw allow 8080/tcp   # qBittorrent Web-UI Port
@@ -36,42 +46,26 @@ sudo ufw allow 7878/tcp   # Radarr Web-UI Port
 sudo ufw allow 8989/tcp   # Sonarr Web-UI Port
 sudo ufw allow 8686/tcp   # Lidarr Web-UI Port
 sudo ufw allow 8096/tcp   # Jellyfin Web-UI Port
+sudo ufw allow from 192.168.1.0/24 to any
 sudo ufw enable
 
 # Benutzer ohne Login für Docker erstellen
 echo "Erstelle Benutzer ohne Login für Docker..."
-sudo useradd -r -M -d / -s /usr/sbin/nologin dockeruser
+sudo useradd -r -M -d / -s /usr/sbin/nologin dockeruser --group docker
 
-# Docker-Group hinzufügen
-echo "Füge den Benutzer zur Docker-Gruppe hinzu..."
-sudo usermod -aG docker dockeruser
+# Einen neuen Benutzer ohne Login für WireGuard erstellen
+echo "Erstelle Benutzer ohne Login für WireGuard..."
+sudo useradd --system --no-create-home --shell /usr/sbin/nologin --group wireguarduser
 
 # Docker-Compose Setup
 echo "Erstelle das Docker-Compose-Verzeichnis und die Konfigurationsdateien..."
-mkdir -p ~/docker/{config/wireguard,config/jackett,config/qbittorrent,config/sonarr,config/radarr,config/lidarr,config/jellyfin}
+mkdir -p ~/docker/{config/jackett,config/qbittorrent,config/sonarr,config/radarr,config/lidarr,config/jellyfin}
 
 # Docker-Compose-Konfiguration (Erstellen der docker-compose.yml Datei)
 cat <<EOF > ~/docker/docker-compose.yml
 version: '3.8'
 
 services:
-  wireguard:
-    image: linuxserver/wireguard:latest
-    container_name: wireguard
-    user: "dockeruser"
-    environment:
-      - PUID=1000
-      - PGID=1000
-    volumes:
-      - ./config/wireguard:/config
-    ports:
-      - 51820:51820/udp
-    cap_add:
-      - NET_ADMIN
-    restart: unless-stopped
-    networks:
-      - vpn_network
-
   jackett:
     image: ghcr.io/linuxserver/jackett:latest
     container_name: jackett
@@ -223,7 +217,18 @@ EOF
 # Docker-Compose Container starten
 echo "Starte die Docker-Container..."
 cd ~/docker
-sudo docker-compose up -d
+sudo -u dockeruser docker-compose up -d
 
 # Skript abgeschlossen
 echo "Installation und Konfiguration abgeschlossen. Alle Dienste laufen jetzt über das VPN unter einem Benutzer ohne Login."
+
+# Server-Informationen ausgeben
+IP_ADDRESS=$(hostname -I | awk '{print $1}')
+VPN_STATUS=$(sudo wg show | grep 'interface' || echo "VPN nicht aktiv")
+PORTS=$(sudo docker ps --format "{{.Names}}: {{.Ports}}")
+
+echo "\n===== Server-Status ====="
+echo "IP-Adresse: $IP_ADDRESS"
+echo "VPN-Status: $VPN_STATUS"
+echo "Laufende Dienste & Ports:"
+echo "$PORTS"
