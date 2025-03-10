@@ -7,7 +7,6 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 # Variables
-DOCKER_COMPOSE_VERSION="1.29.2"
 SCRIPT_MAIN="/opt/scripts/server-shutdown.sh"
 SCRIPT_UPDATE="/opt/scripts/update.sh"
 CRON_JOB_1="30 0 * * 1-5 $SCRIPT_MAIN"
@@ -35,7 +34,8 @@ install_docker_compose() {
   echo "Prüfe, ob Docker Compose installiert ist..."
   if ! command -v docker-compose &> /dev/null; then
     echo "Docker Compose ist nicht installiert. Installiere Docker Compose..."
-    sudo curl -L "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+    LATEST_COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
+    sudo curl -L "https://github.com/docker/compose/releases/download/${LATEST_COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
     sudo chmod +x /usr/local/bin/docker-compose
   else
     echo "Docker Compose ist bereits installiert."
