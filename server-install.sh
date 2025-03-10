@@ -160,20 +160,24 @@ done
   cat <<EOF > ~/docker/docker-compose.yml
 version: '3.8'
 services:
-  jackett:
-    image: ghcr.io/linuxserver/jackett:latest
-    container_name: jackett
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
     user: "dockeruser"
     environment:
       - PUID=$DOCKERUSER_UID
       - PGID=$DOCKERUSER_GID
     volumes:
-      - ./config/jackett:/config
-      - /media/movies:/movies
-      - /media/music:/music
-      - /media/series:/series
+      - ./config/prowlarr:/config
+      - /media/downloads:/downloads
     ports:
-      - 9117:9117
+      - 9696:9696
+    environment:
+      - PROWLARR_DOWNLOAD_CLIENT=qBittorrent
+      - PROWLARR_DOWNLOAD_CLIENT_HOST=qbittorrent
+      - PROWLARR_DOWNLOAD_CLIENT_PORT=8080
+      - PROWLARR_DOWNLOAD_CLIENT_USERNAME=admin
+      - PROWLARR_DOWNLOAD_CLIENT_PASSWORD=adminadmin
     restart: unless-stopped
     networks:
       - vpn_network
@@ -214,7 +218,6 @@ services:
       - 8989:8989
     restart: unless-stopped
     depends_on:
-      - jackett
       - qbittorrent
     environment:
       - SONARR_DOWNLOAD_CLIENT=qBittorrent
@@ -222,10 +225,9 @@ services:
       - SONARR_DOWNLOAD_CLIENT_PORT=8080
       - SONARR_DOWNLOAD_CLIENT_USERNAME=admin
       - SONARR_DOWNLOAD_CLIENT_PASSWORD=adminadmin
-      - SONARR_INDEXER=Jackett
-      - SONARR_INDEXER_HOST=jackett
-      - SONARR_INDEXER_PORT=9117
-      - SONARR_INDEXER_APIKEY=YOUR_JACKETT_API_KEY
+      - SONARR_INDEXER=Prowlarr
+      - SONARR_INDEXER_HOST=prowlarr
+      - SONARR_INDEXER_PORT=9696
     networks:
       - vpn_network
 
@@ -243,7 +245,6 @@ services:
       - 7878:7878
     restart: unless-stopped
     depends_on:
-      - jackett
       - qbittorrent
     environment:
       - RADARR_DOWNLOAD_CLIENT=qBittorrent
@@ -251,10 +252,9 @@ services:
       - RADARR_DOWNLOAD_CLIENT_PORT=8080
       - RADARR_DOWNLOAD_CLIENT_USERNAME=admin
       - RADARR_DOWNLOAD_CLIENT_PASSWORD=adminadmin
-      - RADARR_INDEXER=Jackett
-      - RADARR_INDEXER_HOST=jackett
-      - RADARR_INDEXER_PORT=9117
-      - RADARR_INDEXER_APIKEY=YOUR_JACKETT_API_KEY
+      - SONARR_INDEXER=Prowlarr
+      - SONARR_INDEXER_HOST=prowlarr
+      - SONARR_INDEXER_PORT=9696
     networks:
       - vpn_network
 
@@ -272,7 +272,6 @@ services:
       - 8686:8686
     restart: unless-stopped
     depends_on:
-      - jackett
       - qbittorrent
     environment:
       - LIDARR_DOWNLOAD_CLIENT=qBittorrent
@@ -280,10 +279,9 @@ services:
       - LIDARR_DOWNLOAD_CLIENT_PORT=8080
       - LIDARR_DOWNLOAD_CLIENT_USERNAME=admin
       - LIDARR_DOWNLOAD_CLIENT_PASSWORD=adminadmin
-      - LIDARR_INDEXER=Jackett
-      - LIDARR_INDEXER_HOST=jackett
-      - LIDARR_INDEXER_PORT=9117
-      - LIDARR_INDEXER_APIKEY=YOUR_JACKETT_API_KEY
+      - SONARR_INDEXER=Prowlarr
+      - SONARR_INDEXER_HOST=prowlarr
+      - SONARR_INDEXER_PORT=9696
     networks:
       - vpn_network
 
@@ -323,40 +321,26 @@ setup_cron_jobs() {
   (crontab -l 2>/dev/null; echo "$CRON_JOB_2") | crontab -
 }
 
-# Function to start Jackett
-start_jackett() {
-  echo "Starte Jackett..."
-  -u dockeruser docker-compose -f ~/docker/docker-compose.yml up -d jackett
-}
-
-# Function to read API key from Jackett
-read_jackett_api_key() {
-  echo "Lese Jackett API-Schlüssel..."
-  JACKETT_API_KEY=$(-u dockeruser docker exec jackett cat /config/Jackett/ServerConfig.json | jq -r '.ApiKey')
-  if [ -z "$JACKETT_API_KEY" ]; then
-    echo "Fehler: Konnte API-Schlüssel nicht lesen." >&2
-    exit 1
-  fi
-  echo "Jackett API-Schlüssel: $JACKETT_API_KEY"
-}
-
-# Function to update docker-compose.yml with API key
-update_docker_compose_with_api_key() {
-  echo "Aktualisiere docker-compose.yml mit Jackett API-Schlüssel..."
-  sed -i "s/YOUR_JACKETT_API_KEY/$JACKETT_API_KEY/g" ~/docker/docker-compose.yml
-  if grep -q "YOUR_JACKETT_API_KEY" ~/docker/docker-compose.yml; then
-    echo "Fehler: Platzhalter nicht vollständig ersetzt." >&2
-    exit 1
-  fi
-  echo "docker-compose.yml erfolgreich aktualisiert."
-  -u dockeruser docker-compose -f ~/docker/docker-compose.yml down -d jackett
-}
-
 # Function to start docker container
 start_docker_container() {
   echo "Starte die Docker-Container..."
   cd ~/docker
   -u dockeruser docker-compose up -d
+}
+
+# Function to enable AutoDeleteFinished in qbittorrent
+enable_autodeletefinished_qbittorrent() {
+  QBITTORRENT_CONFIG="/config/qBittorrent/qBittorrent.conf"
+  
+  # Ensure the configuration directory exists
+  mkdir -p "$(dirname "$QBITTORRENT_CONFIG")"
+  
+  # Add or modify the AutoDeleteFinished setting
+  if grep -q "AutoDeleteFinished" "$QBITTORRENT_CONFIG"; then
+    sed -i 's/AutoDeleteFinished=false/AutoDeleteFinished=true/' "$QBITTORRENT_CONFIG"
+  else
+    echo "AutoDeleteFinished=true" >> "$QBITTORRENT_CONFIG"
+  fi
 }
 
 # Function to display server information
@@ -388,6 +372,7 @@ main() {
   read_jackett_api_key
   update_docker_compose_with_api_key
   start_docker_container
+  enable_autodeletefinished_qbittorrent
   display_server_info
   echo "Installation und Konfiguration abgeschlossen. Alle Dienste laufen jetzt über das VPN unter einem Benutzer ohne Login."
 }
