@@ -98,6 +98,11 @@ setup_docker_compose() {
 
   echo "Erstelle das Docker-Compose-Verzeichnis und die Konfigurationsdateien..."
   mkdir -p ~/docker/{config/jackett,config/qbittorrent,config/sonarr,config/radarr,config/lidarr,config/jellyfin}
+  
+  echo "Erstelle die zentralen Media-Ordner..."
+  sudo mkdir -p /media/movies /media/music /media/series /media/downloads
+  sudo chown -R dockeruser:dockeruser /media/movies /media/music /media/series /media/downloads
+  sudo chmod -R 775 /media/movies /media/music /media/series /media/downloads
 
   echo "Erstelle docker-compose.yml..."
   cat <<EOF > ~/docker/docker-compose.yml
@@ -114,6 +119,7 @@ services:
       - ./config/jackett:/config
       - /media/movies:/movies
       - /media/music:/music
+      - /media/series:/series
     ports:
       - 9117:9117
     restart: unless-stopped
@@ -151,7 +157,7 @@ services:
       - PGID=1000
     volumes:
       - ./config/sonarr:/config
-      - /media/movies:/movies
+      - /media/series:/series
     ports:
       - 8989:8989
     restart: unless-stopped
@@ -240,6 +246,7 @@ services:
       - ./config/jellyfin:/config
       - /media/movies:/movies
       - /media/music:/music
+      - /media/series:/series
     ports:
       - 8096:8096
     restart: unless-stopped
