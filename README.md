@@ -42,11 +42,3 @@ Nach der Installation kannst du die Konfigurationsdateien im Verzeichnis `config
 ## Unterstützung
 
 Falls du Fragen oder Probleme hast, eröffne ein Issue in diesem Repository oder kontaktiere den Projektmaintainer.
-
-## Lizenz
-
-Dieses Projekt steht unter der MIT-Lizenz. Weitere Informationen findest du in der Datei `LICENSE`.
-
----
-
-Ich hoffe, dieser Text ist hilfreich für deine README-Datei. Du kannst ihn nach Bedarf anpassen.
