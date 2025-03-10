@@ -91,10 +91,20 @@ configure_ufw() {
   sudo ufw enable
 }
 
-# Function to setup Docker Compose
-setup_docker_compose() {
+# Function to create dockeruser and get its UID and GID
+create_dockeruser() {
   echo "Erstelle Benutzer ohne Login für Docker..."
   sudo useradd -r -M -d / -s /usr/sbin/nologin dockeruser --group dockeruser
+  
+  DOCKERUSER_UID=$(id -u dockeruser)
+  DOCKERUSER_GID=$(id -g dockeruser)
+
+  echo "dockeruser UID: $DOCKERUSER_UID, GID: $DOCKERUSER_GID"
+}
+
+# Function to setup Docker Compose
+setup_docker_compose() {
+  create_dockeruser
 
   echo "Erstelle das Docker-Compose-Verzeichnis und die Konfigurationsdateien..."
   mkdir -p ~/docker/{config/jackett,config/qbittorrent,config/sonarr,config/radarr,config/lidarr,config/jellyfin}
@@ -113,8 +123,8 @@ services:
     container_name: jackett
     user: "dockeruser"
     environment:
-      - PUID=1000
-      - PGID=1000
+      - PUID=$DOCKERUSER_UID
+      - PGID=$DOCKERUSER_GID
     volumes:
       - ./config/jackett:/config
       - /media/movies:/movies
@@ -131,8 +141,8 @@ services:
     container_name: qbittorrent
     user: "dockeruser"
     environment:
-      - PUID=1000
-      - PGID=1000
+      - PUID=$DOCKERUSER_UID
+      - PGID=$DOCKERUSER_GID
     volumes:
       - /media/downloads:/downloads
       - ./config/qbittorrent:/config
@@ -153,8 +163,8 @@ services:
     container_name: sonarr
     user: "dockeruser"
     environment:
-      - PUID=1000
-      - PGID=1000
+      - PUID=$DOCKERUSER_UID
+      - PGID=$DOCKERUSER_GID
     volumes:
       - ./config/sonarr:/config
       - /media/series:/series
@@ -182,8 +192,8 @@ services:
     container_name: radarr
     user: "dockeruser"
     environment:
-      - PUID=1000
-      - PGID=1000
+      - PUID=$DOCKERUSER_UID
+      - PGID=$DOCKERUSER_GID
     volumes:
       - ./config/radarr:/config
       - /media/movies:/movies
@@ -211,8 +221,8 @@ services:
     container_name: lidarr
     user: "dockeruser"
     environment:
-      - PUID=1000
-      - PGID=1000
+      - PUID=$DOCKERUSER_UID
+      - PGID=$DOCKERUSER_GID
     volumes:
       - ./config/lidarr:/config
       - /media/music:/music
@@ -240,8 +250,8 @@ services:
     container_name: jellyfin
     user: "dockeruser"
     environment:
-      - PUID=1000
-      - PGID=1000
+      - PUID=$DOCKERUSER_UID
+      - PGID=$DOCKERUSER_GID
     volumes:
       - ./config/jellyfin:/config
       - /media/movies:/movies
@@ -278,8 +288,8 @@ setup_cron_jobs() {
 # Function to display server information
 display_server_info() {
   IP_ADDRESS=$(hostname -I | awk '{print $1}')
-  VPN_STATUS=$(sudo wg show | grep 'interface' || echo "VPN nicht aktiv")
-  PORTS=$(sudo docker ps --format "{{.Names}}: {{.Ports}}")
+  VPN_STATUS=$(sudo -u wireguarduser wg show | grep 'interface' || echo "VPN nicht aktiv")
+  PORTS=$(sudo -u dockeruser docker ps --format "{{.Names}}: {{.Ports}}")
 
   echo "\n===== Server-Status ====="
   echo "IP-Adresse: $IP_ADDRESS"
