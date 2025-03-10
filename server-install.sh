@@ -12,6 +12,17 @@ SCRIPT_UPDATE="/opt/scripts/update.sh"
 CRON_JOB_1="30 0 * * 1-5 $SCRIPT_MAIN"
 CRON_JOB_2="0 17 * * 3 $SCRIPT_UPDATE"
 
+# Funktion, um jq zu installieren
+install_jq() {
+  echo "Prüfe, ob jq installiert ist..."
+  if ! command -v jq &> /dev/null; then
+    echo "jq ist nicht installiert. Installiere jq..."
+    sudo apt-get install -y jq
+  else
+    echo "jq ist bereits installiert."
+  fi
+}
+
 # Function to install Docker
 install_docker() {
   echo "Prüfe, ob Docker installiert ist..."
@@ -267,10 +278,6 @@ networks:
   vpn_network:
     driver: bridge
 EOF
-
-  echo "Starte die Docker-Container..."
-  cd ~/docker
-  sudo -u dockeruser docker-compose up -d
 }
 
 # Function to set up cron jobs
@@ -283,6 +290,33 @@ setup_cron_jobs() {
 
   (crontab -l 2>/dev/null; echo "$CRON_JOB_1") | crontab -
   (crontab -l 2>/dev/null; echo "$CRON_JOB_2") | crontab -
+}
+
+# Function to start Jackett
+start_jackett() {
+  echo "Starte Jackett..."
+  sudo -u dockeruser docker-compose -f ~/docker/docker-compose.yml up -d jackett
+}
+
+# Function to read API key from Jackett
+read_jackett_api_key() {
+  echo "Lese Jackett API-Schlüssel..."
+  JACKETT_API_KEY=$(sudo -u dockeruser docker exec jackett cat /config/Jackett/ServerConfig.json | jq -r '.ApiKey')
+  echo "Jackett API-Schlüssel: $JACKETT_API_KEY"
+}
+
+# Function to update docker-compose.yml with API key
+update_docker_compose_with_api_key() {
+  echo "Aktualisiere docker-compose.yml mit Jackett API-Schlüssel..."
+  sed -i "s/YOUR_JACKETT_API_KEY/$JACKETT_API_KEY/g" ~/docker/docker-compose.yml
+  sudo -u dockeruser docker-compose -f ~/docker/docker-compose.yml down -d jackett
+}
+
+# Function to start docker container
+start_docker_container() {
+  echo "Starte die Docker-Container..."
+  cd ~/docker
+  sudo -u dockeruser docker-compose up -d
 }
 
 # Function to display server information
@@ -300,6 +334,7 @@ display_server_info() {
 
 # Main function
 main() {
+  install_jq
   install_docker
   install_docker_compose
   install_wireguard
@@ -307,6 +342,11 @@ main() {
   configure_ufw
   setup_docker_compose
   setup_cron_jobs
+  start_jackett
+  sleep 30  # Wartezeit für Jackett, um vollständig zu starten
+  read_jackett_api_key
+  update_docker_compose_with_api_key
+  start_docker_container
   display_server_info
   echo "Installation und Konfiguration abgeschlossen. Alle Dienste laufen jetzt über das VPN unter einem Benutzer ohne Login."
 }
