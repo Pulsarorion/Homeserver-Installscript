@@ -9,15 +9,15 @@ fi
 # Variables
 SCRIPT_MAIN="/opt/scripts/server-shutdown.sh"
 SCRIPT_UPDATE="/opt/scripts/update.sh"
-CRON_JOB_1="30 0 * * 1-5 $SCRIPT_MAIN"
-CRON_JOB_2="0 17 * * 3 $SCRIPT_UPDATE"
+CRON_JOB_1="30 0 * * 1-5 ${SCRIPT_MAIN}"
+CRON_JOB_2="0 17 * * 3 ${SCRIPT_UPDATE}"
 
 # Funktion, um jq zu installieren
 install_jq() {
   echo "Prüfe, ob jq installiert ist..."
   if ! command -v jq &> /dev/null; then
     echo "jq ist nicht installiert. Installiere jq..."
-    sudo apt-get install -y jq
+    apt-get install -y jq
   else
     echo "jq ist bereits installiert."
   fi
@@ -28,13 +28,13 @@ install_docker() {
   echo "Prüfe, ob Docker installiert ist..."
   if ! command -v docker &> /dev/null; then
     echo "Docker ist nicht installiert. Installiere Docker..."
-    sudo apt update
-    sudo apt install -y apt-transport-https ca-certificates curl software-properties-common
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
-    sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
-    sudo apt update
-    sudo apt install -y docker-ce
-    sudo systemctl enable --now docker
+    apt update
+    apt install -y apt-transport-https ca-certificates curl software-properties-common
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+    add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+    apt update
+    apt install -y docker-ce
+    systemctl enable --now docker
   else
     echo "Docker ist bereits installiert."
   fi
@@ -46,8 +46,8 @@ install_docker_compose() {
   if ! command -v docker-compose &> /dev/null; then
     echo "Docker Compose ist nicht installiert. Installiere Docker Compose..."
     LATEST_COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
-    sudo curl -L "https://github.com/docker/compose/releases/download/${LATEST_COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-    sudo chmod +x /usr/local/bin/docker-compose
+    curl -L "https://github.com/docker/compose/releases/download/${LATEST_COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+    chmod +x /usr/local/bin/docker-compose
   else
     echo "Docker Compose ist bereits installiert."
   fi
@@ -58,8 +58,7 @@ install_wireguard() {
   echo "Prüfe, ob WireGuard installiert ist..."
   if ! command -v wg > /dev/null 2>&1; then
     echo "WireGuard ist nicht installiert. Installiere WireGuard..."
-    sudo apt update
-    sudo apt install -y wireguard wireguard-tools
+    apt install -y wireguard wireguard-tools
   else
     echo "WireGuard ist bereits installiert."
   fi
@@ -68,44 +67,54 @@ install_wireguard() {
 # Function to configure WireGuard
 configure_wireguard() {
   echo "Erstelle Benutzer ohne Login für WireGuard..."
-  sudo useradd --system --no-create-home --shell /usr/sbin/nologin --group wireguarduser
+  useradd --system --no-create-home --shell /usr/sbin/nologin --group wireguarduser
 
   echo "Konfiguriere WireGuard..."
-  sudo mkdir -p /etc/wireguard
-  sudo chown wireguarduser:wireguarduser /etc/wireguard
-  sudo chmod 700 /etc/wireguard
-  sudo touch /etc/wireguard/wg0.conf
-  sudo chown wireguarduser:wireguarduser /etc/wireguard/wg0.conf
-  sudo chmod 600 /etc/wireguard/wg0.conf
-  sudo systemctl enable wg-quick@wg0.service
-  sudo sed -i 's/^ExecStart=.*$/ExecStart=\/usr\/bin\/wg-quick up wg0/' /etc/systemd/system/wg-quick@wg0.service
-  sudo sed -i 's/^User=nobody$/User=wireguarduser/' /etc/systemd/system/wg-quick@wg0.service
-  sudo sed -i 's/^Group=nogroup$/Group=wireguarduser/' /etc/systemd/system/wg-quick@wg0.service
+  mkdir -p /etc/wireguard
+  chown wireguarduser:wireguarduser /etc/wireguard
+  chmod 700 /etc/wireguard
+  touch /etc/wireguard/wg0.conf
+  chown wireguarduser:wireguarduser /etc/wireguard/wg0.conf
+  chmod 600 /etc/wireguard/wg0.conf
+  systemctl enable wg-quick@wg0.service
+  sed -i 's/^ExecStart=.*$/ExecStart=\/usr\/bin\/wg-quick up wg0/' /etc/systemd/system/wg-quick@wg0.service
+  sed -i 's/^User=nobody$/User=wireguarduser/' /etc/systemd/system/wg-quick@wg0.service
+  sed -i 's/^Group=nogroup$/Group=wireguarduser/' /etc/systemd/system/wg-quick@wg0.service
+}
+
+# Function to install UFW
+install_ufw() {
+  echo "Prüfe, ob UFW installiert ist..."
+  if ! command -v ufw &> /dev/null; then
+    echo "UFW ist nicht installiert. Installiere UFW..."
+    apt-get install -y ufw
+  else
+    echo "UFW ist bereits installiert."
+  fi
 }
 
 # Function to configure UFW
 configure_ufw() {
-  echo "Installiere und konfiguriere UFW (Firewall)..."
-  sudo apt install -y ufw
-  sudo ufw default deny incoming
-  sudo ufw default deny outgoing
-  sudo ufw allow out on wg0  # Nur VPN für ausgehenden Verkehr
-  sudo ufw allow in on wg0
-  sudo ufw allow 51820/udp  # WireGuard Port
-  sudo ufw allow 9117/tcp   # Jackett Web-UI Port
-  sudo ufw allow 8080/tcp   # qBittorrent Web-UI Port
-  sudo ufw allow 7878/tcp   # Radarr Web-UI Port
-  sudo ufw allow 8989/tcp   # Sonarr Web-UI Port
-  sudo ufw allow 8686/tcp   # Lidarr Web-UI Port
-  sudo ufw allow 8096/tcp   # Jellyfin Web-UI Port
-  sudo ufw allow from 192.168.1.0/24 to any
-  sudo ufw enable
+  echo "Konfiguriere UFW (Firewall)..."
+  ufw default deny incoming
+  ufw default deny outgoing
+  ufw allow out on wg0  # Nur VPN für ausgehenden Verkehr
+  ufw allow in on wg0
+  ufw allow 51820/udp  # WireGuard Port
+  ufw allow 9117/tcp   # Jackett Web-UI Port
+  ufw allow 8080/tcp   # qBittorrent Web-UI Port
+  ufw allow 7878/tcp   # Radarr Web-UI Port
+  ufw allow 8989/tcp   # Sonarr Web-UI Port
+  ufw allow 8686/tcp   # Lidarr Web-UI Port
+  ufw allow 8096/tcp   # Jellyfin Web-UI Port
+  ufw allow from 192.168.1.0/24 to any
+  ufw enable
 }
 
 # Function to create dockeruser and get its UID and GID
 create_dockeruser() {
   echo "Erstelle Benutzer ohne Login für Docker..."
-  sudo useradd -r -M -d / -s /usr/sbin/nologin dockeruser --group dockeruser
+  useradd -r -M -d / -s /usr/sbin/nologin dockeruser --group dockeruser
   
   DOCKERUSER_UID=$(id -u dockeruser)
   DOCKERUSER_GID=$(id -g dockeruser)
@@ -117,13 +126,35 @@ create_dockeruser() {
 setup_docker_compose() {
   create_dockeruser
 
-  echo "Erstelle das Docker-Compose-Verzeichnis und die Konfigurationsdateien..."
-  mkdir -p ~/docker/{config/jackett,config/qbittorrent,config/sonarr,config/radarr,config/lidarr,config/jellyfin}
-  
-  echo "Erstelle die zentralen Media-Ordner..."
-  sudo mkdir -p /media/movies /media/music /media/series /media/downloads
-  sudo chown -R dockeruser:dockeruser /media/movies /media/music /media/series /media/downloads
-  sudo chmod -R 775 /media/movies /media/music /media/series /media/downloads
+echo "Erstelle das Docker-Compose-Verzeichnis und die Konfigurationsdateien..."
+for dir in ~/docker/config/jackett ~/docker/config/qbittorrent ~/docker/config/sonarr ~/docker/config/radarr ~/docker/config/lidarr ~/docker/config/jellyfin; do
+  if [ ! -d "$dir" ]; then
+    mkdir -p "$dir"
+  else
+    echo "Verzeichnis $dir existiert bereits."
+  fi
+done
+
+echo "Setze Berechtigungen und Eigentümer für Docker-Compose-Verzeichnis..."
+for dir in ~/docker/config/jackett ~/docker/config/qbittorrent ~/docker/config/sonarr ~/docker/config/radarr ~/docker/config/lidarr ~/docker/config/jellyfin; do
+  chown -R dockeruser:dockeruser "$dir"
+  chmod -R 775 "$dir"
+done
+
+echo "Erstelle die zentralen Media-Ordner..."
+for dir in /media/movies /media/music /media/series /media/downloads; do
+  if [ ! -d "$dir" ]; then
+    mkdir -p "$dir"
+  else
+    echo "Verzeichnis $dir existiert bereits."
+  fi
+done
+
+echo "Setze Berechtigungen und Eigentümer für Media-Ordner..."
+for dir in /media/movies /media/music /media/series /media/downloads; do
+  chown -R dockeruser:dockeruser "$dir"
+  chmod -R 775 "$dir"
+done
 
   echo "Erstelle docker-compose.yml..."
   cat <<EOF > ~/docker/docker-compose.yml
@@ -283,10 +314,10 @@ EOF
 # Function to set up cron jobs
 setup_cron_jobs() {
   echo "Richte Update und Shutdown Scripte ein..."
-  sudo mkdir -p /opt/scripts/
-  sudo curl -L -o /opt/scripts/server-shutdown.sh https://github.com/Pulsarorion/Homeserver-Installscript/blob/main/server-shutdown.sh
-  sudo curl -L -o /opt/scripts/update.sh https://github.com/Pulsarorion/Homeserver-Installscript/blob/main/update.sh
-  sudo chmod +x /opt/scripts/server-shutdown.sh && sudo chmod +x /opt/scripts/update.sh
+  mkdir -p /opt/scripts/
+  curl -L -o /opt/scripts/server-shutdown.sh https://github.com/Pulsarorion/Homeserver-Installscript/blob/main/server-shutdown.sh
+  curl -L -o /opt/scripts/update.sh https://github.com/Pulsarorion/Homeserver-Installscript/blob/main/update.sh
+  chmod +x /opt/scripts/server-shutdown.sh && chmod +x /opt/scripts/update.sh
 
   (crontab -l 2>/dev/null; echo "$CRON_JOB_1") | crontab -
   (crontab -l 2>/dev/null; echo "$CRON_JOB_2") | crontab -
@@ -295,13 +326,17 @@ setup_cron_jobs() {
 # Function to start Jackett
 start_jackett() {
   echo "Starte Jackett..."
-  sudo -u dockeruser docker-compose -f ~/docker/docker-compose.yml up -d jackett
+  -u dockeruser docker-compose -f ~/docker/docker-compose.yml up -d jackett
 }
 
 # Function to read API key from Jackett
 read_jackett_api_key() {
   echo "Lese Jackett API-Schlüssel..."
-  JACKETT_API_KEY=$(sudo -u dockeruser docker exec jackett cat /config/Jackett/ServerConfig.json | jq -r '.ApiKey')
+  JACKETT_API_KEY=$(-u dockeruser docker exec jackett cat /config/Jackett/ServerConfig.json | jq -r '.ApiKey')
+  if [ -z "$JACKETT_API_KEY" ]; then
+    echo "Fehler: Konnte API-Schlüssel nicht lesen." >&2
+    exit 1
+  fi
   echo "Jackett API-Schlüssel: $JACKETT_API_KEY"
 }
 
@@ -309,21 +344,26 @@ read_jackett_api_key() {
 update_docker_compose_with_api_key() {
   echo "Aktualisiere docker-compose.yml mit Jackett API-Schlüssel..."
   sed -i "s/YOUR_JACKETT_API_KEY/$JACKETT_API_KEY/g" ~/docker/docker-compose.yml
-  sudo -u dockeruser docker-compose -f ~/docker/docker-compose.yml down -d jackett
+  if grep -q "YOUR_JACKETT_API_KEY" ~/docker/docker-compose.yml; then
+    echo "Fehler: Platzhalter nicht vollständig ersetzt." >&2
+    exit 1
+  fi
+  echo "docker-compose.yml erfolgreich aktualisiert."
+  -u dockeruser docker-compose -f ~/docker/docker-compose.yml down -d jackett
 }
 
 # Function to start docker container
 start_docker_container() {
   echo "Starte die Docker-Container..."
   cd ~/docker
-  sudo -u dockeruser docker-compose up -d
+  -u dockeruser docker-compose up -d
 }
 
 # Function to display server information
 display_server_info() {
   IP_ADDRESS=$(hostname -I | awk '{print $1}')
-  VPN_STATUS=$(sudo -u wireguarduser wg show | grep 'interface' || echo "VPN nicht aktiv")
-  PORTS=$(sudo -u dockeruser docker ps --format "{{.Names}}: {{.Ports}}")
+  VPN_STATUS=$(-u wireguarduser wg show | grep 'interface' || echo "VPN nicht aktiv")
+  PORTS=$(-u dockeruser docker ps --format "{{.Names}}: {{.Ports}}")
 
   echo "\n===== Server-Status ====="
   echo "IP-Adresse: $IP_ADDRESS"
@@ -339,6 +379,7 @@ main() {
   install_docker_compose
   install_wireguard
   configure_wireguard
+  install_ufw
   configure_ufw
   setup_docker_compose
   setup_cron_jobs
