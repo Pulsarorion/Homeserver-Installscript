@@ -24,6 +24,7 @@ else
     echo "Docker Compose ist bereits installiert."
 fi
 
+# Überprüfen ob WireGuard installiert ist, und diesen installieren, wenn nötig
 echo "Prüfe, ob WireGuard installiert ist..."
 if ! command -v wg > /dev/null 2>&1; then
     echo "WireGuard ist nicht installiert. Installiere WireGuard..."
@@ -31,6 +32,9 @@ if ! command -v wg > /dev/null 2>&1; then
     sudo apt install -y wireguard
 else
     echo "WireGuard ist bereits installiert."
+
+# WireGuard konfigurieren
+
 
 # UFW (Uncomplicated Firewall) installieren und konfigurieren
 echo "Installiere und konfiguriere UFW (Firewall)..."
@@ -51,7 +55,7 @@ sudo ufw enable
 
 # Benutzer ohne Login für Docker erstellen
 echo "Erstelle Benutzer ohne Login für Docker..."
-sudo useradd -r -M -d / -s /usr/sbin/nologin dockeruser --group docker
+sudo useradd -r -M -d / -s /usr/sbin/nologin dockeruser --group dockeruser
 
 # Einen neuen Benutzer ohne Login für WireGuard erstellen
 echo "Erstelle Benutzer ohne Login für WireGuard..."
@@ -221,6 +225,21 @@ sudo -u dockeruser docker-compose up -d
 
 # Skript abgeschlossen
 echo "Installation und Konfiguration abgeschlossen. Alle Dienste laufen jetzt über das VPN unter einem Benutzer ohne Login."
+
+# Update und Shutdown Sctipte einrichten
+sudo mkdir -p /opt/scripts/
+sudo curl -L -o /opt/scripts/server-shutdown.sh https://github.com/Pulsarorion/Homeserver-Installscript/blob/main/server-shutdown.sh
+sudo curl -L -o /opt/scripts/update.sh https://github.com/Pulsarorion/Homeserver-Installscript/blob/main/update.sh
+sudo chmod +x /opt/scripts/server-shutdown.sh && sudo chmod +x /opt/scripts/update.sh
+
+SCRIPT_MAIN="/opt/scripts/server-shutdown.sh" # Pfad zu Server Shutdown Script
+SCRIPT_UPDATE="/opt/scripts/update.sh" # Pfad zu Server Update Script
+
+CRON_JOB_1="30 0 * * 1-5 $SCRIPT_MAIN"
+CRON_JOB_2="0 17 * * 3 $SCRIPT_UPDATE"
+
+(crontab -l 2>/dev/null; echo "$CRON_JOB_1") | crontab -
+(crontab -l 2>/dev/null; echo "$CRON_JOB_2") | crontab -
 
 # Server-Informationen ausgeben
 IP_ADDRESS=$(hostname -I | awk '{print $1}')
