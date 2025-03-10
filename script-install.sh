@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# Überprüfen ob das Script als Root ausgeführt wird
+if [ "$(id -u)" -ne 0 ]; then
+  echo "This script must be run as root" >&2
+  exit 1
+fi
+
 # Überprüfen, ob Docker und Docker-Compose installiert sind, und diese installieren, wenn nötig
 echo "Prüfe, ob Docker installiert ist..."
 if ! command -v docker &> /dev/null; then
@@ -18,7 +24,7 @@ fi
 echo "Prüfe, ob Docker Compose installiert ist..."
 if ! command -v docker-compose &> /dev/null; then
     echo "Docker Compose ist nicht installiert. Installiere Docker Compose..."
-    sudo curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+    sudo curl -L "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
     sudo chmod +x /usr/local/bin/docker-compose
 else
     echo "Docker Compose ist bereits installiert."
