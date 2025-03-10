@@ -108,7 +108,6 @@ services:
     environment:
       - WEBUI_PORT=8080
       - UPLOAD_SPEED=0  # Verhindert das Hochladen
-      - DOWNLOAD_SPEED=0  # Optional: Falls du Downloads auch limitieren möchtest
     networks:
       - vpn_network
 
