@@ -29,12 +29,29 @@ echo "Prüfe, ob WireGuard installiert ist..."
 if ! command -v wg > /dev/null 2>&1; then
     echo "WireGuard ist nicht installiert. Installiere WireGuard..."
     sudo apt update
-    sudo apt install -y wireguard
+    sudo apt install -y wireguard wireguard-tools
 else
     echo "WireGuard ist bereits installiert."
 
-# WireGuard konfigurieren
+# Einen neuen Benutzer ohne Login für WireGuard erstellen
+echo "Erstelle Benutzer ohne Login für WireGuard..."
+sudo useradd --system --no-create-home --shell /usr/sbin/nologin --group wireguarduser
 
+# WireGuard konfigurieren
+# Ordner erstellen
+sudo mkdir -p /etc/wireguard
+sudo chown wireguarduser:wireguarduser /etc/wireguard
+sudo chmod 700 /etc/wireguard
+# Konfigurationsdatei erstellen
+sudo touch /etc/wireguard/wg0.conf
+sudo chown wireguarduser:wireguarduser /etc/wireguard/wg0.conf
+sudo chmod 600 /etc/wireguard/wg0.conf
+# Auto-Start einrichten
+sudo systemctl enable wg-quick@wg0.service
+# Ausführung unter wireguarduser setzen
+sudo sed -i 's/^ExecStart=.*$/ExecStart=\/usr\/bin\/wg-quick up wg0/' /etc/systemd/system/wg-quick@wg0.service
+sudo sed -i 's/^User=nobody$/User=wireguarduser/' /etc/systemd/system/wg-quick@wg0.service
+sudo sed -i 's/^Group=nogroup$/Group=wireguarduser/' /etc/systemd/system/wg-quick@wg0.service
 
 # UFW (Uncomplicated Firewall) installieren und konfigurieren
 echo "Installiere und konfiguriere UFW (Firewall)..."
@@ -56,10 +73,6 @@ sudo ufw enable
 # Benutzer ohne Login für Docker erstellen
 echo "Erstelle Benutzer ohne Login für Docker..."
 sudo useradd -r -M -d / -s /usr/sbin/nologin dockeruser --group dockeruser
-
-# Einen neuen Benutzer ohne Login für WireGuard erstellen
-echo "Erstelle Benutzer ohne Login für WireGuard..."
-sudo useradd --system --no-create-home --shell /usr/sbin/nologin --group wireguarduser
 
 # Docker-Compose Setup
 echo "Erstelle das Docker-Compose-Verzeichnis und die Konfigurationsdateien..."
