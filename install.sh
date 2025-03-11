@@ -41,18 +41,18 @@ install_ufw() {
 }
 configure_ufw() {
   echo "Settingup UFW (Firewall) now"
-  ufw default deny incoming
-  ufw default deny outgoing
+  ufw default deny incoming # Block Incoming
+  ufw default deny outgoing # Block Outgoing
   ufw allow out on wg0  # VPN
   ufw allow in on wg0 # VPN
-  ufw allow 51820/udp  # WireGuard Port
-  ufw allow 8080/tcp   # qBittorrent Web-UI Port
-  ufw allow 6881/tcp   # qBittorrent Download
-  ufw allow 6881/udp   # qBittorrent Download
-  ufw allow 7878/tcp   # Radarr Web-UI Port
-  ufw allow 8989/tcp   # Sonarr Web-UI Port
-  ufw allow 8686/tcp   # Lidarr Web-UI Port
-  ufw allow 8096/tcp   # Jellyfin Web-UI Port
+  ufw allow out on wg0 to any port 8080 proto tcp   # qBittorrent Web-UI Port
+  ufw allow out on wg0 to any port 6881 proto tcp   # qBittorrent Download
+  ufw allow out on wg0 to any port 6881 proto udp   # qBittorrent Download
+  ufw allow out on wg0 to any port 7878 proto tcp   # Radarr Web-UI Port
+  ufw allow out on wg0 to any port 8989 proto tcp   # Sonarr Web-UI Port
+  ufw allow out on wg0 to any port 8686 proto tcp   # Lidarr Web-UI Port
+  ufw allow out on wg0 to any port 9696 proto tcp   # Prowlarr Web-UI Port
+  ufw allow out on wg0 to any port 8096 proto tcp   # Jellyfin Web-UI Port
   ufw allow from 192.168.1.0/24 to any
   ufw enable
 }
