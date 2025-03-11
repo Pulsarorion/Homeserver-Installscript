@@ -14,6 +14,8 @@ sudo ufw reload
 echo "Führe System-Update durch..."
 sudo apt update && sudo apt upgrade -y && sudo apt dist-upgrade -y
 
+# Pull newest Docker releases
+
 # Ursprüngliche Firewall-Regeln wiederherstellen
 sudo ufw default deny incoming
 sudo ufw default deny outgoing
