@@ -41,8 +41,8 @@ install_ufw() {
 }
 configure_ufw() {
   echo "Settingup UFW (Firewall) now"
-  ufw default deny incoming # Block Incoming
-  ufw default deny outgoing # Block Outgoing
+#  ufw default deny incoming # Block Incoming
+#  ufw default deny outgoing # Block Outgoing
   ufw allow out on wg0  # VPN
   ufw allow in on wg0 # VPN
   ufw allow out on wg0 to any port 8080 proto tcp   # qBittorrent Web-UI Port
